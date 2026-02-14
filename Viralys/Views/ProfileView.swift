@@ -10,6 +10,9 @@ struct ProfileView: View {
     @State private var selectedTextResult: TextAnalysisResult?
     @State private var showTextResultDetail = false
     @State private var appeared = false
+    @State private var showAPIKeySheet = false
+    @State private var apiKeyInput = ""
+    @State private var showAPIKeySaved = false
 
     var body: some View {
         NavigationView {
@@ -65,6 +68,9 @@ struct ProfileView: View {
             if let result = selectedTextResult {
                 TextResultsView(result: result, onDismiss: { showTextResultDetail = false })
             }
+        }
+        .sheet(isPresented: $showAPIKeySheet) {
+            apiKeySheet
         }
         .onAppear {
             withAnimation(DS.Anim.spring) {
@@ -375,9 +381,111 @@ struct ProfileView: View {
         }
     }
 
+    // MARK: - API Key Sheet
+    private var apiKeySheet: some View {
+        NavigationView {
+            ZStack {
+                DS.Colors.background.ignoresSafeArea()
+
+                VStack(spacing: DS.Spacing.lg) {
+                    // Info
+                    VStack(spacing: DS.Spacing.sm) {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(DS.Colors.primaryGradient)
+
+                        Text("Claude API Key")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(DS.Colors.textPrimary)
+
+                        Text("Required for text post optimization. Get your key at console.anthropic.com")
+                            .font(.system(size: 14))
+                            .foregroundColor(DS.Colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, DS.Spacing.lg)
+                    }
+                    .padding(.top, DS.Spacing.xl)
+
+                    // Input field
+                    VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                        SecureField("sk-ant-...", text: $apiKeyInput)
+                            .font(.system(size: 15, design: .monospaced))
+                            .foregroundColor(DS.Colors.textPrimary)
+                            .padding(DS.Spacing.md)
+                            .background(DS.Colors.cardElevated)
+                            .cornerRadius(DS.Radius.lg)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                    }
+                    .padding(.horizontal, DS.Spacing.lg)
+
+                    // Save button
+                    GradientButton("Save API Key", icon: "checkmark.shield.fill") {
+                        let trimmed = apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        UserDefaults.standard.set(trimmed, forKey: APIConfig.apiKeyUserDefaultsKey)
+                        HapticManager.success()
+                        showAPIKeySheet = false
+                    }
+                    .padding(.horizontal, DS.Spacing.lg)
+
+                    // Remove key button
+                    if APIConfig.hasValidKey {
+                        TextButton("Remove API Key", color: DS.Colors.error) {
+                            UserDefaults.standard.removeObject(forKey: APIConfig.apiKeyUserDefaultsKey)
+                            apiKeyInput = ""
+                            HapticManager.warning()
+                            showAPIKeySheet = false
+                        }
+                    }
+
+                    Spacer()
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showAPIKeySheet = false
+                    }
+                    .foregroundColor(DS.Colors.accent)
+                }
+            }
+        }
+    }
+
     // MARK: - Settings
     private var settingsSection: some View {
         VStack(spacing: 0) {
+            // API Key row
+            Button {
+                apiKeyInput = UserDefaults.standard.string(forKey: APIConfig.apiKeyUserDefaultsKey) ?? ""
+                showAPIKeySheet = true
+            } label: {
+                HStack(spacing: DS.Spacing.md) {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(APIConfig.hasValidKey ? DS.Colors.success : DS.Colors.warning)
+                        .frame(width: 24)
+
+                    Text("Claude API Key")
+                        .font(.system(size: 15))
+                        .foregroundColor(DS.Colors.textPrimary)
+
+                    Spacer()
+
+                    Text(APIConfig.hasValidKey ? "Configured" : "Not Set")
+                        .font(.system(size: 13))
+                        .foregroundColor(APIConfig.hasValidKey ? DS.Colors.success : DS.Colors.textSecondary)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DS.Colors.textSecondary.opacity(0.5))
+                }
+                .padding(.horizontal, DS.Spacing.md)
+                .padding(.vertical, DS.Spacing.md)
+            }
+
+            Divider().background(DS.Colors.cardElevated)
             settingsRow(icon: "info.circle", title: "About Viralys")
             Divider().background(DS.Colors.cardElevated)
             settingsRow(icon: "doc.text", title: "Terms of Service")
